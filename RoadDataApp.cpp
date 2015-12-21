@@ -12,16 +12,24 @@
 #include <iomanip>
 #include <fstream>
 #include <map>
+#include <cmath>
 
 struct myPoint{
     RoadPoint p;
     int numb_clast;
-    myPoint(RoadPoint* _p, int _numb_clast):
+    myPoint(RoadPoint* _p, int _numb_clast = -1):
     numb_clast(_numb_clast)
     {
         p.x = _p->x;
         p.y = _p->y;
         p.z = _p->z;
+    }
+    myPoint(double x, double y, double z, int _numb_clast):
+    numb_clast(_numb_clast)
+    {
+        p.x = x;
+        p.y = y;
+        p.z = z;
     }
 };
 /* INTERSECTION
@@ -44,19 +52,26 @@ function IntersectRect(r1:Rectangle, r2:Rectangle):Boolean {
         || r2.bottom < r1.top);
 }
 */
+//BOUNDING BOX
+void createBoundingBox(std::vector<myPoint*>& points){
+    auto xExtremes = std::minmax_element(points.begin(), points.end(),
+                                         [](const myPoint* lhs, const myPoint* rhs) {
+                                             return lhs->p.x < lhs->p.x;
+                                         });
+
+    auto yExtremes = std::minmax_element(points.begin(), points.end(),
+                                         [](const myPoint* lhs, const myPoint* rhs) {
+                                             return lhs->p.y < lhs->p.y;
+                                         });
+    auto zExtremes = std::minmax_element(points.begin(), points.end(),
+                                         [](const myPoint* lhs, const myPoint* rhs) {
+                                             return lhs->p.z < lhs->p.z;
+                                         });
+
+    myPoint upperLeft((*xExtremes.first)->p.x, (*yExtremes.first)->p.y, (*zExtremes.first)->p.z, points[0]->numb_clast);
+    myPoint lowerRight((*xExtremes.second)->p.x, (*yExtremes.second)->p.y, (*zExtremes.second)->p.z, points[0]->numb_clast);
+}
 /* BOUNDING BOX
-auto xExtremes = std::minmax_element(v.begin(), v.end(),
-                                     [](const ofPoint& lhs, const ofPoint& rhs) {
-                                        return lhs.x < rhs.x;
-                                     });
-
-auto yExtremes = std::minmax_element(v.begin(), v.end(),
-                                     [](const ofPoint& lhs, const ofPoint& rhs) {
-                                        return lhs.y < rhs.y;
-                                     });
-
-ofPoint upperLeft(xExtremes.first->x, yExtremes.first->y);
-ofPoint lowerRight(xExtremes.second->x, yExtremes.second->y);
 
 #include <boost/algorithm/minmax_element.hpp>
 bool compareX(ofPoint lhs, ofPoint rhs) { return lhs.x < rhs.x; };
@@ -69,26 +84,23 @@ bool compareY(ofPoint lhs, ofPoint rhs) { return lhs.y < rhs.y; };
     ofPoint upperLeft(xExtremes.first->x, yExtremes.first->y);
     ofPoint lowerRight(xExtremes.second->x, yExtremes.second->y);
 */
-#define R 30     //ширина поиска локальных сгущений - входной параметр алгоритма
+#define R 10     //ширина поиска локальных сгущений - входной параметр алгоритма
 
 double squaredDistance(myPoint* a, myPoint* b){
     return pow(a->p.x - b->p.x, 2) + pow(a->p.y-b->p.y, 2) + pow(a->p.z-b->p.z, 2);
 };
 
-int/*myPoint* */ CenterObject(std::vector<myPoint*>& points, std::vector<int>& indexes){
-    double mindist = 1000000.0;
+int CenterObject(std::vector<myPoint*>& points, std::vector<int>& indexes, std::vector<int>& curclast){
+    double mindist = 1000000000.0;
     double curdist;
-    int minindex = 0;
-    myPoint* minpoint;
-    minpoint = NULL;
-    for (int i = 0; i < indexes.size(); ++i){
+    int minindex = -1;
+    for (int i = 0; i < curclast.size(); ++i){
         curdist = 0.0;
-        for (int j = i + 1; j < indexes.size(); ++j)
-            curdist += squaredDistance(points[indexes[i]], points[indexes[j]]);
+        for (int j = 0; j < curclast.size(); ++j)
+            curdist += sqrt(squaredDistance(points[indexes[curclast[i]]], points[indexes[curclast[j]]]));
         if (mindist > curdist){
-            minpoint = points[indexes[i]];
             mindist = curdist;
-            minindex = indexes[i];
+            minindex = indexes[curclast[i]];
         }
     }
     return minindex;//minpoint;
@@ -97,32 +109,43 @@ int/*myPoint* */ CenterObject(std::vector<myPoint*>& points, std::vector<int>& i
 void genClaster(std::vector<myPoint*>& points, std::vector<int>& indexes, int center, std::vector<int>* curclast){
     for (int i = 0; i < indexes.size(); ++i){
         if (squaredDistance(points[indexes[i]], points[center]) < R*R)
-            curclast->push_back(indexes[i]);
+            curclast->push_back(i);
     }
 }
+
+//void addToClaster((std::vector<myPoint*>& points, std::vector<int>& indexes, int center, std::vector<int>* curclast){
+//    for (int i = 0; i < indexes.size(); ++i){
+//        if (squaredDistance(points[indexes[i]], points[center]) < R*R)
+//            curclast->push_back(i);
+//    }
+//}
 
 int FOREL(std::vector<myPoint*>& allpoints){
     std::vector<int> indexes;
     for (int i = 0; i < allpoints.size(); ++i)
         indexes.push_back(i);
     std::vector<int> curclast;
-    int predcenter, curcenter;
+    int predcenter, curcenter, j = -1;
     int numClast = 0;
     while (indexes.size() > 0){
-        std::cout << "while";
+        curclast.clear();
+        std::cout << indexes.size() <<std::endl;
         predcenter = indexes[rand()%indexes.size()];
         genClaster(allpoints, indexes, predcenter, &curclast);
-        curcenter = CenterObject(allpoints, curclast);
-        while (curcenter != predcenter){
+        curcenter = CenterObject(allpoints, indexes, curclast);
+        while (squaredDistance(allpoints[curcenter], allpoints[predcenter]) > 5){
+            std::cout << curcenter <<" " << predcenter << " " << curclast.size() << std::endl;
             predcenter = curcenter;
             curclast.clear();
             genClaster(allpoints, indexes, predcenter, &curclast);
-            curcenter = CenterObject(allpoints, curclast);
+            curcenter = CenterObject(allpoints, indexes, curclast);
         }
         std::vector<int>::iterator it = indexes.begin();
-        for (int i = 0; i <curclast.size(); ++i){
+        for (int i = 0; i < curclast.size(); ++i){
+            j = indexes[curclast[i]];
+            //std::cout << j;
             indexes.erase(it + curclast[i] - i);
-            allpoints[curclast[i]]->numb_clast= numClast;                  //+height*10
+            allpoints[j]->numb_clast= numClast;                  //+height*10
         }
         ++numClast;
     }
@@ -152,24 +175,24 @@ int _tmain(int argc, _TCHAR* argv[])
     double eps = 10e-5;
     double minZ = 22.6;
     double maxZ = 0;
-    std::vector<myPoint> allpoints;
-    allpoints.reserve(40000);
+    std::vector<myPoint*> allpoints;
+    //allpoints.reserve(40000);
     std::map<int, std::vector<myPoint*> > heights;
     //std::vector<int, std::vector<myPoint*> > heights;
-    for (int i = 0; i < 5/*nBlock*/; ++i)
+    for (int i = 0; i < 20/*nBlock*/; ++i)
     {
         GetCloudPoints(i, points.data(), &pHeader);
-        fout << "Frame #" << i << std::endl;
-        fout << " X: " << pHeader.FrameXCoord << std::setprecision(10);
-        fout << " Y: " << pHeader.FrameYCoord << std::setprecision(10);
-        fout << " Z: " << pHeader.FrameZCoord << std::setprecision(10) << std::endl;
+        //fout << "Frame #" << i << std::endl;
+        //fout << " X: " << pHeader.FrameXCoord << std::setprecision(10);
+        //fout << " Y: " << pHeader.FrameYCoord << std::setprecision(10);
+        //fout << " Z: " << pHeader.FrameZCoord << std::setprecision(10) << std::endl;
         for (int j = 0; j < points.size(); ++j){
             if (points.data()[j].x <eps && points.data()[j].y < eps && points.data()[j].z < eps)
                 continue;
 
-            allpoints.push_back(myPoint(&points.data()[j], -1));
+            //allpoints.push_back(new myPoint(&points.data()[j], -1));
 
-            heights[(int)floor(points.data()[j].z)].push_back(&allpoints[allpoints.size()-1]);
+            heights[(int)floor(points.data()[j].z)].push_back(new myPoint(&points.data()[j], -1));
             //std::cout << allpoints[allpoints.size()-1].numb_clast <<" " << heights[(int)floor(points.data()[j].z)][heights[(int)floor(points.data()[j].z)].size()-1]->numb_clast <<std::endl;
            // for (int k = 0; k < heights[(int)floor(points.data()[j].z)].size(); ++ k)
             //    std::cout << heights[(int)floor(points.data()[j].z)][k]->numb_clast;
@@ -178,14 +201,14 @@ int _tmain(int argc, _TCHAR* argv[])
         }
 
     }
-    std::cout << "All" << allpoints.size()<<std::endl;
+    //std::cout << "All" << allpoints.size()<<std::endl;
     for (std::map<int, std::vector<myPoint*> >::iterator it = heights.begin(); it != heights.end(); ++it){
-        //std::cout << FOREL(it->second);
+        std::cout <<it->first <<" "<<FOREL(it->second) << std::endl;
         //std::cout << it->second.size() << std::endl;
         for (int k = 0; k < it->second.size(); ++k){
             dlib::vector<double> val(it->second[k]->p.x, it->second[k]->p.y, it->second[k]->p.z);
             // Pick a color based on how far we are along the spiral
-            dlib::rgb_pixel color = dlib::colormap_jet(it->second[k]->numb_clast,0,20);
+            dlib::rgb_pixel color = dlib::colormap_jet(it->second[k]->numb_clast,0,5);
             // And add the point to the list of points we will display
             pointsPaint.push_back(dlib::perspective_window::overlay_dot(val, color));
         }
