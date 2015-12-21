@@ -53,6 +53,9 @@ function IntersectRect(r1:Rectangle, r2:Rectangle):Boolean {
 }
 */
 //BOUNDING BOX
+#define A 0.49
+#define H 1
+#define kap 0.5
 void createBoundingBox(std::vector<myPoint*>& points){
     auto xExtremes = std::minmax_element(points.begin(), points.end(),
                                          [](const myPoint* lhs, const myPoint* rhs) {
@@ -68,22 +71,17 @@ void createBoundingBox(std::vector<myPoint*>& points){
                                              return lhs->p.z < lhs->p.z;
                                          });
 
-    myPoint upperLeft((*xExtremes.first)->p.x, (*yExtremes.first)->p.y, (*zExtremes.first)->p.z, points[0]->numb_clast);
-    myPoint lowerRight((*xExtremes.second)->p.x, (*yExtremes.second)->p.y, (*zExtremes.second)->p.z, points[0]->numb_clast);
+    myPoint Left((*xExtremes.first)->p.x, (*yExtremes.first)->p.y, (*zExtremes.first)->p.z, points[0]->numb_clast);
+    myPoint Right((*xExtremes.second)->p.x, (*yExtremes.second)->p.y, (*zExtremes.second)->p.z, points[0]->numb_clast);
 }
-/* BOUNDING BOX
 
-#include <boost/algorithm/minmax_element.hpp>
-bool compareX(ofPoint lhs, ofPoint rhs) { return lhs.x < rhs.x; };
-bool compareY(ofPoint lhs, ofPoint rhs) { return lhs.y < rhs.y; };
+bool checkBox(myPoint Left, myPoint Right){
+    double Lx = fabs(Right.p.x - Left.p.x);
+    double Ly = fabs(Right.p.y - Left.p.y);
+    double Lz = fabs(Right.p.z - Left.p.z);
+    return (Lx*Ly < A && Lz >= kap * H);
+}
 
-// ....
-    pair<vector<ofPoint>::iterator, vector<ofPoint>::iterator> xExtremes, yExtremes;
-    xExtremes = boost::minmax_element(overlap_point.begin(), overlap_point.end(), compareX);
-    yExtremes = boost::minmax_element(overlap_point.begin(), overlap_point.end(), compareY);
-    ofPoint upperLeft(xExtremes.first->x, yExtremes.first->y);
-    ofPoint lowerRight(xExtremes.second->x, yExtremes.second->y);
-*/
 #define R 10     //ширина поиска локальных сгущений - входной параметр алгоритма
 
 double squaredDistance(myPoint* a, myPoint* b){
@@ -192,7 +190,7 @@ int _tmain(int argc, _TCHAR* argv[])
 
             //allpoints.push_back(new myPoint(&points.data()[j], -1));
 
-            heights[(int)floor(points.data()[j].z)].push_back(new myPoint(&points.data()[j], -1));
+            heights[(int)floor(points.data()[j].z/H)].push_back(new myPoint(&points.data()[j], -1));
             //std::cout << allpoints[allpoints.size()-1].numb_clast <<" " << heights[(int)floor(points.data()[j].z)][heights[(int)floor(points.data()[j].z)].size()-1]->numb_clast <<std::endl;
            // for (int k = 0; k < heights[(int)floor(points.data()[j].z)].size(); ++ k)
             //    std::cout << heights[(int)floor(points.data()[j].z)][k]->numb_clast;
@@ -202,6 +200,9 @@ int _tmain(int argc, _TCHAR* argv[])
 
     }
     //std::cout << "All" << allpoints.size()<<std::endl;
+
+    std::map<int, std::vector< std::vector<myPoint*> > > clasters;
+
     for (std::map<int, std::vector<myPoint*> >::iterator it = heights.begin(); it != heights.end(); ++it){
         std::cout <<it->first <<" "<<FOREL(it->second) << std::endl;
         //std::cout << it->second.size() << std::endl;
