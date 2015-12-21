@@ -17,8 +17,12 @@ struct myPoint{
     RoadPoint p;
     int numb_clast;
     myPoint(RoadPoint* _p, int _numb_clast):
-    p(*_p), numb_clast(_numb_clast)
-    {}
+    numb_clast(_numb_clast)
+    {
+        p.x = _p->x;
+        p.y = _p->y;
+        p.z = _p->z;
+    }
 };
 /* INTERSECTION
      createjs.Rectangle.prototype.intersects = function(rect){
@@ -67,11 +71,11 @@ bool compareY(ofPoint lhs, ofPoint rhs) { return lhs.y < rhs.y; };
 */
 #define R 30     //ширина поиска локальных сгущений - входной параметр алгоритма
 
-double squaredDistance(myPoint& a, myPoint& b){
-    return pow(a.p.x - b.p.x, 2) + pow(a.p.y-b.p.y, 2) + pow(a.p.z-b.p.z, 2);
+double squaredDistance(myPoint* a, myPoint* b){
+    return pow(a->p.x - b->p.x, 2) + pow(a->p.y-b->p.y, 2) + pow(a->p.z-b->p.z, 2);
 };
 
-int/*myPoint* */ CenterObject(std::vector<myPoint>& points, std::vector<int>& indexes){
+int/*myPoint* */ CenterObject(std::vector<myPoint*>& points, std::vector<int>& indexes){
     double mindist = 1000000.0;
     double curdist;
     int minindex = 0;
@@ -82,7 +86,7 @@ int/*myPoint* */ CenterObject(std::vector<myPoint>& points, std::vector<int>& in
         for (int j = i + 1; j < indexes.size(); ++j)
             curdist += squaredDistance(points[indexes[i]], points[indexes[j]]);
         if (mindist > curdist){
-            minpoint = &points[indexes[i]];
+            minpoint = points[indexes[i]];
             mindist = curdist;
             minindex = indexes[i];
         }
@@ -90,22 +94,23 @@ int/*myPoint* */ CenterObject(std::vector<myPoint>& points, std::vector<int>& in
     return minindex;//minpoint;
 };
 
-void genClaster(std::vector<myPoint>& points, std::vector<int>& indexes, int center, std::vector<int>* curclast){
+void genClaster(std::vector<myPoint*>& points, std::vector<int>& indexes, int center, std::vector<int>* curclast){
     for (int i = 0; i < indexes.size(); ++i){
         if (squaredDistance(points[indexes[i]], points[center]) < R*R)
             curclast->push_back(indexes[i]);
     }
 }
 
-int FOREL(std::vector<myPoint>& allpoints){
-    std::vector<int> indexes(allpoints.size());
-    for (int i = 0; i < indexes.size(); ++i)
-        indexes[i] = i;
+int FOREL(std::vector<myPoint*>& allpoints){
+    std::vector<int> indexes;
+    for (int i = 0; i < allpoints.size(); ++i)
+        indexes.push_back(i);
     std::vector<int> curclast;
     int predcenter, curcenter;
     int numClast = 0;
     while (indexes.size() > 0){
-        predcenter = rand()%indexes.size();
+        std::cout << "while";
+        predcenter = indexes[rand()%indexes.size()];
         genClaster(allpoints, indexes, predcenter, &curclast);
         curcenter = CenterObject(allpoints, curclast);
         while (curcenter != predcenter){
@@ -117,7 +122,7 @@ int FOREL(std::vector<myPoint>& allpoints){
         std::vector<int>::iterator it = indexes.begin();
         for (int i = 0; i <curclast.size(); ++i){
             indexes.erase(it + curclast[i] - i);
-            allpoints[curclast[i]].numb_clast= numClast;                  //+height*10
+            allpoints[curclast[i]]->numb_clast= numClast;                  //+height*10
         }
         ++numClast;
     }
@@ -148,9 +153,10 @@ int _tmain(int argc, _TCHAR* argv[])
     double minZ = 22.6;
     double maxZ = 0;
     std::vector<myPoint> allpoints;
-    //std::map<int, std::vector<myPoint*> > heights;
-    std::vector<int, std::vector<myPoint*> > heights;
-    for (int i = 0; i < 5/*nBlock*/; i++)
+    allpoints.reserve(40000);
+    std::map<int, std::vector<myPoint*> > heights;
+    //std::vector<int, std::vector<myPoint*> > heights;
+    for (int i = 0; i < 5/*nBlock*/; ++i)
     {
         GetCloudPoints(i, points.data(), &pHeader);
         fout << "Frame #" << i << std::endl;
@@ -160,25 +166,43 @@ int _tmain(int argc, _TCHAR* argv[])
         for (int j = 0; j < points.size(); ++j){
             if (points.data()[j].x <eps && points.data()[j].y < eps && points.data()[j].z < eps)
                 continue;
-            //minZ = min(minZ, points.data()[j].z);
-            //maxZ = max(maxZ, points.data()[j].z);
-            allpoints.push_back(myPoint(&points.data()[j], (int)floor(points.data()[j].z - minZ)));
-            //if (points.data()[j].z - minZ > heights.size())
-            //    heights.push_back(std::vector<myPoint*>());
-            heights[(int)floor((points.data()[j].z - minZ))].push_back(&allpoints[allpoints.size()-1]);
+
+            allpoints.push_back(myPoint(&points.data()[j], -1));
+
+            heights[(int)floor(points.data()[j].z)].push_back(&allpoints[allpoints.size()-1]);
+            //std::cout << allpoints[allpoints.size()-1].numb_clast <<" " << heights[(int)floor(points.data()[j].z)][heights[(int)floor(points.data()[j].z)].size()-1]->numb_clast <<std::endl;
+           // for (int k = 0; k < heights[(int)floor(points.data()[j].z)].size(); ++ k)
+            //    std::cout << heights[(int)floor(points.data()[j].z)][k]->numb_clast;
+            /*if (heights.find(h) == heights.end())
+                heights[h] = std::vector<myPoint*>(1, &allpoints[allpoints.size()-1]);*/
         }
 
     }
-
-    for (std::map<int, std::vector<myPoint*> >::iterator it = heights.begin(); it != heights.end(); ++it)
-        std::cout << FOREL(heights[(it->first)]);
-        for  (int j = 0; j < heigths.size(); ++j){
-            dlib::vector<double> val(allpoints[j].p.x, points.data()[j].y, points.data()[j].z);
+    std::cout << "All" << allpoints.size()<<std::endl;
+    for (std::map<int, std::vector<myPoint*> >::iterator it = heights.begin(); it != heights.end(); ++it){
+        //std::cout << FOREL(it->second);
+        //std::cout << it->second.size() << std::endl;
+        for (int k = 0; k < it->second.size(); ++k){
+            dlib::vector<double> val(it->second[k]->p.x, it->second[k]->p.y, it->second[k]->p.z);
             // Pick a color based on how far we are along the spiral
-            dlib::rgb_pixel color = dlib::colormap_jet(,0,20);
+            dlib::rgb_pixel color = dlib::colormap_jet(it->second[k]->numb_clast,0,20);
             // And add the point to the list of points we will display
             pointsPaint.push_back(dlib::perspective_window::overlay_dot(val, color));
         }
+            //std::cout<<it->second[k]->numb_clast;
+    }
+   /* for (std::map<int, std::vector<myPoint*> >::iterator it = heights.begin(); it != heights.end(); ++it){
+        //std::cout << FOREL(it->second);
+        //std::vector<myPoint*>* tmpvec = &(it->second);
+        int i =  it->first;
+        for  (int j = 0; j < heights[i].size(); ++j){
+            dlib::vector<double> val(heights[i][j]->p.x, heights[i][j]->p.y, heights[i][j]->p.z);
+            // Pick a color based on how far we are along the spiral
+            dlib::rgb_pixel color = dlib::colormap_jet(heights[i][j]->numb_clast,0,20);
+            // And add the point to the list of points we will display
+            pointsPaint.push_back(dlib::perspective_window::overlay_dot(val, color));
+        }
+    }*/
     /*
      //for visualization
             dlib::vector<double> val(points.data()[j].x, points.data()[j].y, points.data()[j].z);
@@ -187,7 +211,7 @@ int _tmain(int argc, _TCHAR* argv[])
             // And add the point to the list of points we will display
             pointsPaint.push_back(dlib::perspective_window::overlay_dot(val, color));*/
     //int FOREL(std::vector<myPoint>& allpoints)
-    std::cout << minZ << maxZ << std::endl;
+    //std::cout << minZ << maxZ << std::endl;
 
     fout.close();
     CloseData();
@@ -199,6 +223,5 @@ int _tmain(int argc, _TCHAR* argv[])
     win.wait_until_closed();
 
 
-	return 0;
+    return 0;
 }
-
