@@ -142,7 +142,7 @@ int FOREL(std::vector<myPoint*>& allpoints, std::vector< myClast >& clasters){
             allpoints[j]->numb_clast= numClast;
             clasters[numClast].elems.push_back(allpoints[j]);
         }
-        std::cout << "SIZEofclaster " << clasters[numClast].elems.size()<<std::endl;
+        //std::cout << "SIZEofclaster " << clasters[numClast].elems.size()<<std::endl;
         std::pair<myPoint, myPoint> box = createBoundingBox(clasters[numClast].elems);
         clasters[numClast].box = box;
         if (!checkBox(std::get<0>(box), std::get<1>(box))){
@@ -204,7 +204,6 @@ for (int outer = 0; outer < nBlock / 20; ++outer){                  // outer
     for (std::map<int, std::vector<myPoint*> >::iterator it = heights.begin(); it != heights.end(); ++it){
         int z = it->first;
         std::cout <<it->first <<" "<<FOREL(it->second, clasters[z]);
-        std::cout << " " << clasters[z].size() << std::endl;
         if (!clasters[z].size())
             clasters.erase(z);
 
@@ -215,6 +214,7 @@ for (int outer = 0; outer < nBlock / 20; ++outer){                  // outer
             pointsPaint.push_back(dlib::perspective_window::overlay_dot(val, color));
         } */
     }
+    heights.clear();
     bool f = false;
     for (std::map<int, std::vector< myClast > >::const_reverse_iterator itlevel1 = clasters.crbegin(); itlevel1 != clasters.crend(); ++itlevel1){
         int level1 = itlevel1->first;
@@ -226,7 +226,6 @@ for (int outer = 0; outer < nBlock / 20; ++outer){                  // outer
                 f = false;
                 for (int clastl2 = 0; clastl2 < itlevel2->second.size(); ++clastl2){
                     if (IntersectRect(itlevel1->second[clastl1].box, itlevel2->second[clastl2].box)){
-                        std::cout << "yep" << " ";
                         f = true;
                         clasters[level2][clastl2].elems.insert(clasters[level2][clastl2].elems.end(), 
                                                                 clasters[level1][clastl1].elems.begin(), clasters[level1][clastl1].elems.end());
@@ -236,7 +235,6 @@ for (int outer = 0; outer < nBlock / 20; ++outer){                  // outer
                     }
                 }
                 if (!f){ //copy down
-                    std::cout << "none";
                     clasters[level2].push_back(clasters[level1][clastl1]);
                     clasters[level1][clastl1].elems.clear();
                 }
@@ -254,7 +252,6 @@ for (int outer = 0; outer < nBlock / 20; ++outer){                  // outer
             f = false;
             for (int clastl2 = 0; clastl2 < itlevel2->second.size(); ++clastl2){
                 if (IntersectRect(itlevel1->second[clastl1].box, itlevel2->second[clastl2].box)){
-                    //std::cout << "yep" << " ";
                     f = true;
                     clasters[level2][clastl2].elems.insert(clasters[level2][clastl2].elems.end(), 
                                                             clasters[level1][clastl1].elems.begin(), clasters[level1][clastl1].elems.end());
@@ -264,7 +261,6 @@ for (int outer = 0; outer < nBlock / 20; ++outer){                  // outer
                 }
             }
             if (!f){ //copy down
-                //std::cout << "none";
                 clasters[level2].push_back(clasters[level1][clastl1]);
                 clasters[level1][clastl1].elems.clear();
             }
@@ -284,18 +280,16 @@ for (int outer = 0; outer < nBlock / 20; ++outer){                  // outer
         }
     }*/
     clustersALL.insert(clustersALL.end(), clasters.begin()->second.begin(),clasters.begin()->second.end());
+    std::cout << "now all clusters " << clustersALL.size() << std::endl;
     clasters.clear();
 }  //outer
-    
-/*
-     //for visualization
-            dlib::vector<double> val(points.data()[j].x, points.data()[j].y, points.data()[j].z);
-            // Pick a color based on how far we are along the spiral
-            dlib::rgb_pixel color = dlib::colormap_jet(1,0,20);
-            // And add the point to the list of points we will display
-            pointsPaint.push_back(dlib::perspective_window::overlay_dot(val, color));*/
-    //int FOREL(std::vector<myPoint>& allpoints)
-    //std::cout << minZ << maxZ << std::endl;
+    for (int l = 0; l < clustersALL.size(); ++l){
+            for (int k = 0; k < clustersALL[l].elems.size(); ++k){
+                dlib::vector<double> val(clustersALL[l].elems[k]->p.x, clustersALL[l].elems[k]->p.y, clustersALL[l].elems[k]->p.z);
+                dlib::rgb_pixel color = dlib::colormap_jet(l+5,0, clustersALL.size()+5);
+                pointsPaint.push_back(dlib::perspective_window::overlay_dot(val, color));
+         }
+    }
 
     fout.close();
     CloseData();
