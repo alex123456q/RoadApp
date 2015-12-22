@@ -123,18 +123,6 @@ void genClaster(std::vector<myPoint*>& points, std::vector<int>& indexes, myPoin
             curclast->push_back(i);
     }
 }
-/*
-void addToClaster((std::vector<myPoint*>& points, std::vector<int>& indexes, int center, std::vector<int>* curclast){
-    int j = 0;
-    int sz = curlast.size();
-    for (int i = 0; i < sz; ++i){
-        while (j < curlast[i]){
-            if (squaredDistance(points[indexes[j]], points[center]) < R*R)
-                curclast->push_back(j);
-            ++j;
-        }
-    }
-}*/
 
 struct myClast{
     std::pair<myPoint, myPoint> box;
@@ -142,7 +130,7 @@ struct myClast{
 
     myClast(){};
 };
-int FOREL(std::vector<myPoint*>& allpoints, std::vector< myClast > * clasters){
+int FOREL(std::vector<myPoint*>& allpoints, std::vector< myClast >& clasters){
     std::vector<int> indexes;
     for (int i = 0; i < allpoints.size(); ++i)
         indexes.push_back(i);
@@ -165,27 +153,26 @@ int FOREL(std::vector<myPoint*>& allpoints, std::vector< myClast > * clasters){
         }
         std::vector<int>::iterator it = indexes.begin();
         //std::vector<myPoint*> clastpoints;
-        if (clasters->size() < numClast + 1)
-            clasters->resize(numClast + 1);
+        if (clasters.size() < numClast + 1)
+            clasters.resize(numClast + 1);
         for (int i = 0; i < curclast.size(); ++i){
-            j = indexes[curclast[i]];
+            j = indexes[curclast[i]-i];
             //std::cout << j;
             indexes.erase(it + curclast[i] - i);
             allpoints[j]->numb_clast= numClast;                  //+height*10
-            (*clasters)[numClast].elems.push_back(allpoints[j]);
+            clasters[numClast].elems.push_back(allpoints[j]);
             //вообще можно, наверное, взять макс и мин значения иксов и иже с ними ручками
         }
-        std::cout << "SIZEofclaster " << (*clasters)[numClast].elems.size()<<std::endl;
-        //std::pair<myPoint, myPoint> box = createBoundingBox((*clasters)[numClast].elems);
-        (*clasters)[numClast].box = createBoundingBox((*clasters)[numClast].elems);
-        std::pair<myPoint, myPoint> box = createBoundingBox((*clasters)[numClast].elems);
+        std::cout << "SIZEofclaster " << clasters[numClast].elems.size()<<std::endl;
+        std::pair<myPoint, myPoint> box = createBoundingBox(clasters[numClast].elems);
+        clasters[numClast].box = box;//createBoundingBox(clasters[numClast].elems);
+        //std::pair<myPoint, myPoint> box = createBoundingBox(clasters[numClast].elems);
         if (!checkBox(std::get<0>(box), std::get<1>(box))){
-            //(*clasters)[numClast].elems.clear();
+            //clasters[numClast].elems.clear();
             //--numClast;
         }
         ++numClast;
     }
-    std::cout << "before exit " << clasters->size() << std::endl;
     return numClast;
 };
 
@@ -243,16 +230,18 @@ int _tmain(int argc, _TCHAR* argv[])
     std::map<int, std::vector< myClast > > clasters;
 
     for (std::map<int, std::vector<myPoint*> >::iterator it = heights.begin(); it != heights.end(); ++it){
-        std::cout <<it->first <<" "<<FOREL(it->second, &clasters[it->first]) << " " << clasters[it->first].size() << std::endl;
+        int z = it->first;
+        std::cout <<it->first <<" "<<FOREL(it->second, clasters[z]);
+        std::cout << " " << clasters[z].size() << std::endl;
         //std::cout << it->second.size() << std::endl;
-        if (it->first == 22){
+        
         for (int k = 0; k < it->second.size(); ++k){
             dlib::vector<double> val(it->second[k]->p.x, it->second[k]->p.y, it->second[k]->p.z);
             // Pick a color based on how far we are along the spiral
             dlib::rgb_pixel color = dlib::colormap_jet(it->second[k]->numb_clast,0,6);
             // And add the point to the list of points we will display
             pointsPaint.push_back(dlib::perspective_window::overlay_dot(val, color));
-        } }
+        } 
             //std::cout<<it->second[k]->numb_clast;
     }
    /* for (std::map<int, std::vector<myPoint*> >::iterator it = heights.begin(); it != heights.end(); ++it){
