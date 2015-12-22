@@ -40,19 +40,6 @@ struct myPoint{
 };
 
 typedef std::pair<myPoint, myPoint> Box;
-/* INTERSECTION
-     createjs.Rectangle.prototype.intersects = function(rect){
-                return (this.x <= rect.x + rect.width &&
-                        rect.x <= this.x + this.width &&
-                        this.y <= rect.y + rect.height &&
-                        rect.y <= this.y + this.height);
-            }
-            */
-//ANOTHER
-bool DoBoxesIntersect(Box a, Box b) {
-  return (abs(a.first.p.x - b.first.p.x) * 2 < (a.first.p.x - a.second.p.x + b.first.p.x - b.second.p.x)) &&
-         (abs(a.first.p.y - b.first.p.y) * 2 < (a.first.p.x - a.second.p.x + b.first.p.x - b.second.p.x));
-}
 bool IntersectRect(Box a, Box b) {
     return !(a.first.p.x > b.second.p.x
         || a.second.p.x < b.first.p.x
@@ -100,25 +87,16 @@ double squaredDistance(myPoint* a, myPoint* b){
 };
 
 myPoint CenterObject(std::vector<myPoint*>& points, std::vector<int>& indexes, std::vector<int>& curclast){
-    //double mindist = 1000000000.0;
-    //double curdist;
-    //int minindex = -1;
     myPoint centre;
     for (int i = 0; i < curclast.size(); ++i){
         centre.p.x += points[indexes[curclast[i]]]->p.x;
         centre.p.y += points[indexes[curclast[i]]]->p.y;
         centre.p.z += points[indexes[curclast[i]]]->p.z;
-    /*    for (int j = 0; j < curclast.size(); ++j)
-            curdist += sqrt(squaredDistance(points[indexes[curclast[i]]], points[indexes[curclast[j]]]));
-        if (mindist > curdist){
-            mindist = curdist;
-            minindex = indexes[curclast[i]];
-        }*/
     }
     centre.p.x /= curclast.size();
     centre.p.y /= curclast.size();
     centre.p.z /= curclast.size();
-    return centre;//minindex;
+    return centre;
 };
 
 void genClaster(std::vector<myPoint*>& points, std::vector<int>& indexes, myPoint center, std::vector<int>* curclast){
@@ -199,13 +177,12 @@ int _tmain(int argc, _TCHAR* argv[])
     std::vector<dlib::perspective_window::overlay_dot> pointsPaint;
     
     double eps = 10e-5;
-    double minZ = 22.6;
-    double maxZ = 0;
-    std::vector<myPoint*> allpoints;
-    //allpoints.reserve(40000);
+
     std::map<int, std::vector<myPoint*> > heights;
-    //std::vector<int, std::vector<myPoint*> > heights;
-    for (int i = 0; i < 20/*nBlock*/; ++i)
+    std::vector< myClast > clustersALL;
+    //int outer = 0;
+for (int outer = 0; outer < nBlock / 20; ++outer){                  // outer
+    for (int i = outer*20; i < 20*(outer+1)/*nBlock*/; ++i)
     {
         GetCloudPoints(i, points.data(), &pHeader);
         //fout << "Frame #" << i << std::endl;
@@ -221,7 +198,6 @@ int _tmain(int argc, _TCHAR* argv[])
         }
 
     }
-    //std::cout << "All" << allpoints.size()<<std::endl;
 
     std::map<int, std::vector< myClast > > clasters;
 
@@ -241,36 +217,77 @@ int _tmain(int argc, _TCHAR* argv[])
     }
     bool f = false;
     for (std::map<int, std::vector< myClast > >::const_reverse_iterator itlevel1 = clasters.crbegin(); itlevel1 != clasters.crend(); ++itlevel1){
-        for (int l = 0; l < itlevel1->second.size(); ++l){
-            for (std::map<int, std::vector< myClast > >:: const_reverse_iterator itlevel2 = itlevel1; itlevel2 != clasters.crend(); ++itlevel2){
+        int level1 = itlevel1->first;
+        for (int clastl1 = 0; clastl1 < itlevel1->second.size(); ++clastl1){
+                std::map<int, std::vector< myClast > >:: const_reverse_iterator itlevel2 = itlevel1;
+                ++itlevel2;
+            //for (std::map<int, std::vector< myClast > >:: const_reverse_iterator itlevel2 = itlevel1; itlevel2 != clasters.crend(); ++itlevel2){
                 int level2 = itlevel2->first;
-                int level1 = itlevel1->first;
                 f = false;
                 for (int clastl2 = 0; clastl2 < itlevel2->second.size(); ++clastl2){
-                    if (IntersectRect(itlevel1->second[l].box, itlevel2->second[clastl2].box)){
+                    if (IntersectRect(itlevel1->second[clastl1].box, itlevel2->second[clastl2].box)){
                         std::cout << "yep" << " ";
                         f = true;
-                        //for (int i = 0; i < it2->second[l2].elems.size(); ++i)
-                        //    static_cast<std::vector<myPoint*> >(it->second[l].elems).push_back(static_cast<myPoint*const&>(it2->second[l2].elems[i]));
-                       // static_cast<std::vector<myPoint*> >(it2->second[l2].elems).clear();
-                        clasters[level1][l].elems.insert(clasters[level1][l].elems.end(), 
-                            clasters[level2][clastl2].elems.begin(), clasters[level2][clastl2].elems.end());
-                        clasters[level2][clastl2].elems.clear();
-                        break;
+                        clasters[level2][clastl2].elems.insert(clasters[level2][clastl2].elems.end(), 
+                                                                clasters[level1][clastl1].elems.begin(), clasters[level1][clastl1].elems.end());
+                        clasters[level1][clastl1].elems.clear();
+                        clasters[level2][clastl2].box = createBoundingBox(clasters[level2][clastl2].elems);
                         //it->second[l].elems.insert(it->second[l].elems.end(), it2->second[l2].elems.begin(), it2->second[l2].elems.end());
                     }
                 }
-                //clasters[level2].erase();
-                //if (!f) only copy  down
+                if (!f){ //copy down
+                    std::cout << "none";
+                    clasters[level2].push_back(clasters[level1][clastl1]);
+                    clasters[level1][clastl1].elems.clear();
+                }
+        }
+        clasters[level1].clear();
+        clasters.erase(level1);
+    }
+    auto itlevel1 = clasters.begin();
+    auto itlevel2  = clasters.begin();
+    ++itlevel1;
+    int level1 = itlevel1->first;
+    for (int clastl1 = 0; clastl1 < itlevel1->second.size(); ++clastl1){
+            //for (std::map<int, std::vector< myClast > >:: const_reverse_iterator itlevel2 = itlevel1; itlevel2 != clasters.crend(); ++itlevel2){
+            int level2 = itlevel2->first;
+            f = false;
+            for (int clastl2 = 0; clastl2 < itlevel2->second.size(); ++clastl2){
+                if (IntersectRect(itlevel1->second[clastl1].box, itlevel2->second[clastl2].box)){
+                    //std::cout << "yep" << " ";
+                    f = true;
+                    clasters[level2][clastl2].elems.insert(clasters[level2][clastl2].elems.end(), 
+                                                            clasters[level1][clastl1].elems.begin(), clasters[level1][clastl1].elems.end());
+                    clasters[level1][clastl1].elems.clear();
+                    clasters[level2][clastl2].box = createBoundingBox(clasters[level2][clastl2].elems);
+                    //it->second[l].elems.insert(it->second[l].elems.end(), it2->second[l2].elems.begin(), it2->second[l2].elems.end());
+                }
             }
+            if (!f){ //copy down
+                //std::cout << "none";
+                clasters[level2].push_back(clasters[level1][clastl1]);
+                clasters[level1][clastl1].elems.clear();
+            }
+    }
+    clasters[level1].clear();
+    clasters.erase(level1);
+
+
+    std::cout <<"end " << clasters.size() << " " <<clasters.begin()->second.size() << std::endl;
+    /*for (std::map<int, std::vector< myClast > >::const_reverse_iterator itlevel1 = clasters.crbegin(); itlevel1 != clasters.crend(); ++itlevel1){
+        for (int l = 0; l < itlevel1->second.size(); ++l){
             for (int k = 0; k < itlevel1->second[l].elems.size(); ++k){
                 dlib::vector<double> val(itlevel1->second[l].elems[k]->p.x, itlevel1->second[l].elems[k]->p.y, itlevel1->second[l].elems[k]->p.z);
-                dlib::rgb_pixel color = dlib::colormap_jet(itlevel1->second[l].elems[k]->numb_clast,0,2);
+                dlib::rgb_pixel color = dlib::colormap_jet(l+5,0, itlevel1->second.size()+5);
                 pointsPaint.push_back(dlib::perspective_window::overlay_dot(val, color));
             }
         }
-    }
-    /*
+    }*/
+    clustersALL.insert(clustersALL.end(), clasters.begin()->second.begin(),clasters.begin()->second.end());
+    clasters.clear();
+}  //outer
+    
+/*
      //for visualization
             dlib::vector<double> val(points.data()[j].x, points.data()[j].y, points.data()[j].z);
             // Pick a color based on how far we are along the spiral
