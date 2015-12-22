@@ -15,6 +15,7 @@
 #include <cmath>
 #include <tuple>
 
+
 struct myPoint{
     RoadPoint p;
     int numb_clast;
@@ -37,6 +38,8 @@ struct myPoint{
         p.z = z;
     }
 };
+
+typedef std::pair<myPoint, myPoint> Box;
 /* INTERSECTION
      createjs.Rectangle.prototype.intersects = function(rect){
                 return (this.x <= rect.x + rect.width &&
@@ -44,23 +47,25 @@ struct myPoint{
                         this.y <= rect.y + rect.height &&
                         rect.y <= this.y + this.height);
             }
-
-ANOTHER
+            */
+//ANOTHER
 bool DoBoxesIntersect(Box a, Box b) {
-  return (abs(a.x - b.x) * 2 < (a.width + b.width)) &&
-         (abs(a.y - b.y) * 2 < (a.height + b.height));
+  return (abs(a.first.p.x - b.first.p.x) * 2 < (a.first.p.x - a.second.p.x + b.first.p.x - b.second.p.x)) &&
+         (abs(a.first.p.y - b.first.p.y) * 2 < (a.first.p.x - a.second.p.x + b.first.p.x - b.second.p.x));
 }
-function IntersectRect(r1:Rectangle, r2:Rectangle):Boolean {
-    return !(r2.left > r1.right
-        || r2.right < r1.left
-        || r2.top > r1.bottom
-        || r2.bottom < r1.top);
+bool IntersectRect(Box a, Box b) {
+    return !(a.first.p.x > b.second.p.x
+        || a.second.p.x < b.first.p.x
+        || a.first.p.y > b.second.p.y
+        || a.second.p.y < b.first.p.y);
 }
-*/
-//BOUNDING BOX
-#define A 5.0//0.49
+
+#define A 0.49
 #define H 1
 #define kap 0.5
+#define R 6     //radius of clasterization
+
+//BOUNDING BOX
 std::pair<myPoint, myPoint> createBoundingBox(std::vector<myPoint*>& points){
     auto xExtremes = std::minmax_element(points.begin(), points.end(),
                                          [](const myPoint* lhs, const myPoint* rhs) {
@@ -85,11 +90,10 @@ bool checkBox(myPoint Left, myPoint Right){
     double Lx = fabs(Right.p.x - Left.p.x);
     double Ly = fabs(Right.p.y - Left.p.y);
     double Lz = fabs(Right.p.z - Left.p.z);
-    std::cout << "LLLL " << Lx << " "<<  Ly << " "<< Lz << std::endl;
+    //std::cout << "LLLL " << Lx << " "<<  Ly << " "<< Lz << std::endl;
     return (Lx*Ly < A && Lz >= kap * H);
 }
 
-#define R 6     //ширина поиска локальных сгущений - входной параметр алгоритма
 
 double squaredDistance(myPoint* a, myPoint* b){
     return pow(a->p.x - b->p.x, 2) + pow(a->p.y-b->p.y, 2) + pow(a->p.z-b->p.z, 2);
@@ -140,7 +144,7 @@ int FOREL(std::vector<myPoint*>& allpoints, std::vector< myClast >& clasters){
     int numClast = 0;
     while (indexes.size() > 0){
         curclast.clear();
-        std::cout << indexes.size() <<std::endl;
+        //std::cout << indexes.size() <<std::endl;
         predcenter = *allpoints[indexes[rand()%indexes.size()]];
         genClaster(allpoints, indexes, predcenter, &curclast);
         curcenter = CenterObject(allpoints, indexes, curclast);
@@ -152,27 +156,25 @@ int FOREL(std::vector<myPoint*>& allpoints, std::vector< myClast >& clasters){
             curcenter = CenterObject(allpoints, indexes, curclast);
         }
         std::vector<int>::iterator it = indexes.begin();
-        //std::vector<myPoint*> clastpoints;
         if (clasters.size() < numClast + 1)
             clasters.resize(numClast + 1);
         for (int i = 0; i < curclast.size(); ++i){
             j = indexes[curclast[i]-i];
-            //std::cout << j;
             indexes.erase(it + curclast[i] - i);
-            allpoints[j]->numb_clast= numClast;                  //+height*10
+            allpoints[j]->numb_clast= numClast;
             clasters[numClast].elems.push_back(allpoints[j]);
-            //вообще можно, наверное, взять макс и мин значения иксов и иже с ними ручками
         }
         std::cout << "SIZEofclaster " << clasters[numClast].elems.size()<<std::endl;
         std::pair<myPoint, myPoint> box = createBoundingBox(clasters[numClast].elems);
-        clasters[numClast].box = box;//createBoundingBox(clasters[numClast].elems);
-        //std::pair<myPoint, myPoint> box = createBoundingBox(clasters[numClast].elems);
+        clasters[numClast].box = box;
         if (!checkBox(std::get<0>(box), std::get<1>(box))){
-            //clasters[numClast].elems.clear();
-            //--numClast;
+            clasters[numClast].elems.clear();                 //comment this 2 lines to see
+            --numClast;                                       //whole clasterization
         }
         ++numClast;
     }
+    if (clasters[clasters.size() - 1].elems.empty())
+        clasters.pop_back();
     return numClast;
 };
 
@@ -215,13 +217,7 @@ int _tmain(int argc, _TCHAR* argv[])
                 continue;
 
             //allpoints.push_back(new myPoint(&points.data()[j], -1));
-
             heights[(int)floor(points.data()[j].z/H)].push_back(new myPoint(&points.data()[j], -1));
-            //std::cout << allpoints[allpoints.size()-1].numb_clast <<" " << heights[(int)floor(points.data()[j].z)][heights[(int)floor(points.data()[j].z)].size()-1]->numb_clast <<std::endl;
-           // for (int k = 0; k < heights[(int)floor(points.data()[j].z)].size(); ++ k)
-            //    std::cout << heights[(int)floor(points.data()[j].z)][k]->numb_clast;
-            /*if (heights.find(h) == heights.end())
-                heights[h] = std::vector<myPoint*>(1, &allpoints[allpoints.size()-1]);*/
         }
 
     }
@@ -233,29 +229,47 @@ int _tmain(int argc, _TCHAR* argv[])
         int z = it->first;
         std::cout <<it->first <<" "<<FOREL(it->second, clasters[z]);
         std::cout << " " << clasters[z].size() << std::endl;
-        //std::cout << it->second.size() << std::endl;
-        
+        if (!clasters[z].size())
+            clasters.erase(z);
+
+        /* PaintALL
         for (int k = 0; k < it->second.size(); ++k){
             dlib::vector<double> val(it->second[k]->p.x, it->second[k]->p.y, it->second[k]->p.z);
-            // Pick a color based on how far we are along the spiral
             dlib::rgb_pixel color = dlib::colormap_jet(it->second[k]->numb_clast,0,6);
-            // And add the point to the list of points we will display
             pointsPaint.push_back(dlib::perspective_window::overlay_dot(val, color));
-        } 
-            //std::cout<<it->second[k]->numb_clast;
+        } */
     }
-   /* for (std::map<int, std::vector<myPoint*> >::iterator it = heights.begin(); it != heights.end(); ++it){
-        //std::cout << FOREL(it->second);
-        //std::vector<myPoint*>* tmpvec = &(it->second);
-        int i =  it->first;
-        for  (int j = 0; j < heights[i].size(); ++j){
-            dlib::vector<double> val(heights[i][j]->p.x, heights[i][j]->p.y, heights[i][j]->p.z);
-            // Pick a color based on how far we are along the spiral
-            dlib::rgb_pixel color = dlib::colormap_jet(heights[i][j]->numb_clast,0,20);
-            // And add the point to the list of points we will display
-            pointsPaint.push_back(dlib::perspective_window::overlay_dot(val, color));
+    bool f = false;
+    for (std::map<int, std::vector< myClast > >::const_reverse_iterator itlevel1 = clasters.crbegin(); itlevel1 != clasters.crend(); ++itlevel1){
+        for (int l = 0; l < itlevel1->second.size(); ++l){
+            for (std::map<int, std::vector< myClast > >:: const_reverse_iterator itlevel2 = itlevel1; itlevel2 != clasters.crend(); ++itlevel2){
+                int level2 = itlevel2->first;
+                int level1 = itlevel1->first;
+                f = false;
+                for (int clastl2 = 0; clastl2 < itlevel2->second.size(); ++clastl2){
+                    if (IntersectRect(itlevel1->second[l].box, itlevel2->second[clastl2].box)){
+                        std::cout << "yep" << " ";
+                        f = true;
+                        //for (int i = 0; i < it2->second[l2].elems.size(); ++i)
+                        //    static_cast<std::vector<myPoint*> >(it->second[l].elems).push_back(static_cast<myPoint*const&>(it2->second[l2].elems[i]));
+                       // static_cast<std::vector<myPoint*> >(it2->second[l2].elems).clear();
+                        clasters[level1][l].elems.insert(clasters[level1][l].elems.end(), 
+                            clasters[level2][clastl2].elems.begin(), clasters[level2][clastl2].elems.end());
+                        clasters[level2][clastl2].elems.clear();
+                        break;
+                        //it->second[l].elems.insert(it->second[l].elems.end(), it2->second[l2].elems.begin(), it2->second[l2].elems.end());
+                    }
+                }
+                //clasters[level2].erase();
+                //if (!f) only copy  down
+            }
+            for (int k = 0; k < itlevel1->second[l].elems.size(); ++k){
+                dlib::vector<double> val(itlevel1->second[l].elems[k]->p.x, itlevel1->second[l].elems[k]->p.y, itlevel1->second[l].elems[k]->p.z);
+                dlib::rgb_pixel color = dlib::colormap_jet(itlevel1->second[l].elems[k]->numb_clast,0,2);
+                pointsPaint.push_back(dlib::perspective_window::overlay_dot(val, color));
+            }
         }
-    }*/
+    }
     /*
      //for visualization
             dlib::vector<double> val(points.data()[j].x, points.data()[j].y, points.data()[j].z);
